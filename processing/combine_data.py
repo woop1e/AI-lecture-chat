@@ -1,27 +1,32 @@
 import json
 import os
 
+# Input and output file paths
 transcript_file = "output/transcript_segments.json"
 ocr_file = "output/ocr_with_timestamps.json"
 output_file = "output/final_combined.json"
 
+# Load transcript segments
 with open(transcript_file, "r", encoding="utf-8") as f:
     transcript_segments = json.load(f)
-
+    
+# Load OCR slide data
 with open(ocr_file, "r", encoding="utf-8") as f:
     ocr_slides = json.load(f)
 
 combined = []
 
+# Match each slide with related transcript segments
 for slide in ocr_slides:
     slide_time = slide.get("timestamp")
     slide_text = slide.get("text", "").strip()
-
+    
+ # Find transcript parts that align with or are close to the slide timestamp
     related_segments = [
         seg for seg in transcript_segments
         if seg["start"] <= slide_time <= seg["end"] or abs(seg["start"] - slide_time) < 20
     ]
-
+ # Combine text from matching transcript segments
     speech_text = " ".join(seg["text"].strip() for seg in related_segments)
     
     combined.append({
@@ -33,6 +38,7 @@ for slide in ocr_slides:
 
 os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
+# Save the combined data as JSON
 with open(output_file, "w", encoding="utf-8") as f:
     json.dump(combined, f, indent=4, ensure_ascii=False)
 
