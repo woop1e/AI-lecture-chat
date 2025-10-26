@@ -20,7 +20,7 @@ result = model.transcribe(input_audio, language="en", verbose=False)
 
 with open(output_text, "w", encoding="utf-8") as f:
     f.write(result["text"])
-
+#for timecoded segments
 segments = [
     {
         "start": round(seg["start"], 2),
