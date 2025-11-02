@@ -5,16 +5,46 @@ const { queryOllama } = require('../services/ollamaService');
 
 const router = express.Router();
 
-// Chat endpoint
+const HISTORY_DIR = path.join(__dirname, '../../processing/history');
+const HISTORY_FILE = path.join(HISTORY_DIR, 'chat_sessions.json');
+
+if (!fs.existsSync(HISTORY_DIR)) {
+  fs.mkdirSync(HISTORY_DIR, { recursive: true });
+}
+
+if (!fs.existsSync(HISTORY_FILE)) {
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify({ sessions: [] }, null, 2));
+}
+
+function loadHistory() {
+  try {
+    return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf-8'));
+  } catch (error) {
+    return { sessions: [] };
+  }
+}
+
+function saveHistory(history) {
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
+}
+
+function createSession(videoName) {
+  return {
+    id: Date.now().toString(),
+    videoName: videoName || 'lecture.mp4',
+    createdAt: new Date().toISOString(),
+    chats: []
+  };
+}
+
 router.post('/', async (req, res) => {
   try {
-    const { question } = req.body;
+    const { question, sessionId } = req.body;
 
     if (!question || question.trim() === '') {
       return res.status(400).json({ error: 'Question is required' });
     }
 
-    // Load lecture data
     const dataPath = path.join(__dirname, '../../processing/output/final_combined.json');
     
     if (!fs.existsSync(dataPath)) {
@@ -24,17 +54,35 @@ router.post('/', async (req, res) => {
     }
 
     const lectureData = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
-
-    // Create context from lecture data
     const context = buildContext(lectureData);
 
-    // Query Ollama
     const answer = await queryOllama(question, context);
+
+    const history = loadHistory();
+    let session = history.sessions.find(s => s.id === sessionId);
+    
+    if (!session) {
+      session = createSession();
+      history.sessions.push(session);
+    }
+
+    session.chats.push({
+      timestamp: new Date().toISOString(),
+      question,
+      answer
+    });
+
+    if (history.sessions.length > 50) {
+      history.sessions = history.sessions.slice(-50);
+    }
+
+    saveHistory(history);
 
     res.json({
       success: true,
       question,
       answer,
+      sessionId: session.id,
       timestamp: new Date().toISOString()
     });
 
@@ -44,6 +92,66 @@ router.post('/', async (req, res) => {
       error: 'Failed to get answer',
       message: error.message 
     });
+  }
+});
+
+router.get('/history', (req, res) => {
+  try {
+    const history = loadHistory();
+    res.json({
+      success: true,
+      sessions: history.sessions.reverse() 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/history/:sessionId', (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const history = loadHistory();
+    const session = history.sessions.find(s => s.id === sessionId);
+    
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    res.json({
+      success: true,
+      session
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/history/:sessionId', (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const history = loadHistory();
+    history.sessions = history.sessions.filter(s => s.id !== sessionId);
+    saveHistory(history);
+
+    res.json({
+      success: true,
+      message: 'Session deleted'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Clear all history
+router.delete('/history', (req, res) => {
+  try {
+    saveHistory({ sessions: [] });
+    res.json({
+      success: true,
+      message: 'All history cleared'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

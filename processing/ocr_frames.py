@@ -5,7 +5,6 @@ import json
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Set the path to Tesseract OCR
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 frames_dir = os.path.join(script_dir, "output/frames")

@@ -4,12 +4,13 @@ const API_URL = 'http://localhost:3000/api';
 // State
 let selectedFile = null;
 let processingInterval = null;
+let currentSessionId = null;
 
 // DOM Elements
 const uploadArea = document.getElementById('upload-area');
 const videoInput = document.getElementById('video-input');
 const fileSelected = document.getElementById('file-selected');
-const fileName = document.getElementById('file-name');  
+const fileName = document.getElementById('file-name');
 const fileSize = document.getElementById('file-size');
 const uploadBtn = document.getElementById('upload-btn');
 const chatInput = document.getElementById('chat-input');
@@ -21,6 +22,7 @@ const newVideoBtn = document.getElementById('new-video-btn');
 const uploadSection = document.getElementById('upload-section');
 const processingSection = document.getElementById('processing-section');
 const chatSection = document.getElementById('chat-section');
+const historySection = document.getElementById('history-section');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', init);
@@ -32,6 +34,28 @@ function init() {
 
 // Setup Event Listeners
 function setupEventListeners() {
+    // Tab switching
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetTab = tab.dataset.tab;
+            
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            document.getElementById(`${targetTab}-section`).classList.remove('hidden');
+            
+            if (targetTab === 'history') {
+                loadFullHistory();
+            } else if (targetTab === 'chat') {
+                loadSessions();
+            }
+        });
+    });
+
     // File input
     videoInput.addEventListener('change', handleFileSelect);
     
@@ -46,19 +70,23 @@ function setupEventListeners() {
     // Chat
     sendBtn.addEventListener('click', sendMessage);
     chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessage();
-    });
-    
-    // Quick questions
-    document.querySelectorAll('.quick-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            chatInput.value = btn.dataset.question;
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
             sendMessage();
-        });
+        }
+    });
+
+    // Auto-resize textarea
+    chatInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
     });
     
     // New video button
     newVideoBtn.addEventListener('click', resetApp);
+
+    // Refresh history button
+    document.getElementById('refresh-history-btn').addEventListener('click', loadFullHistory);
 }
 
 // File Selection
@@ -97,7 +125,7 @@ function handleDrop(e) {
 function displaySelectedFile(file) {
     fileName.textContent = file.name;
     fileSize.textContent = formatFileSize(file.size);
-    fileSelected.style.display = 'block';
+    fileSelected.classList.remove('hidden');
     uploadArea.style.display = 'none';
 }
 
@@ -134,6 +162,8 @@ async function uploadVideo() {
         
         if (data.success) {
             showStatus('Video uploaded successfully!', 'success');
+            uploadSection.classList.add('hidden');
+            processingSection.classList.remove('hidden');
             setTimeout(() => startProcessing(), 1000);
         } else {
             throw new Error(data.error || 'Upload failed');
@@ -142,7 +172,6 @@ async function uploadVideo() {
         console.error('Upload error:', error);
         let errorMessage = error.message;
         
-        // Check if backend is running
         if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
             errorMessage = 'Cannot connect to backend. Make sure server is running on http://localhost:3000';
         }
@@ -160,12 +189,12 @@ async function checkExistingVideo() {
         const data = await response.json();
         
         if (data.exists) {
-            // Check if already processed
             const statusResponse = await fetch(`${API_URL}/process/status`);
             const statusData = await statusResponse.json();
             
             if (statusData.isComplete) {
-                showChatSection();
+                document.querySelector('[data-tab="chat"]').click();
+                loadSessions();
             }
         }
     } catch (error) {
@@ -175,8 +204,6 @@ async function checkExistingVideo() {
 
 // Start Processing
 async function startProcessing() {
-    showSection('processing');
-    
     try {
         const response = await fetch(`${API_URL}/process/start`, {
             method: 'POST'
@@ -208,13 +235,13 @@ function monitorProcessing() {
                 clearInterval(processingInterval);
                 setTimeout(() => {
                     showStatus('Processing complete!', 'success');
-                    showChatSection();
+                    document.querySelector('[data-tab="chat"]').click();
                 }, 1000);
             }
         } catch (error) {
             console.error('Status check error:', error);
         }
-    }, 2000); // Check every 2 seconds
+    }, 2000);
 }
 
 function updateProgress(data) {
@@ -224,7 +251,6 @@ function updateProgress(data) {
     progressFill.style.width = data.progress + '%';
     progressText.textContent = data.progress + '%';
     
-    // Update step icons
     const steps = {
         audio: document.getElementById('step-audio'),
         frames: document.getElementById('step-frames'),
@@ -236,7 +262,7 @@ function updateProgress(data) {
     Object.keys(data.files).forEach(key => {
         if (data.files[key] && steps[key]) {
             steps[key].classList.add('completed');
-            steps[key].querySelector('.step-icon').textContent = '✅';
+            steps[key].querySelector('span').textContent = '✓';
         }
     });
 }
@@ -246,9 +272,9 @@ async function sendMessage() {
     const question = chatInput.value.trim();
     if (!question) return;
     
-    // Add user message
     addMessage(question, 'user');
     chatInput.value = '';
+    chatInput.style.height = 'auto';
     chatInput.disabled = true;
     sendBtn.disabled = true;
     
@@ -261,16 +287,20 @@ async function sendMessage() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ question })
+            body: JSON.stringify({ 
+                question,
+                sessionId: currentSessionId 
+            })
         });
         
         const data = await response.json();
         
-        // Remove typing indicator
         removeTypingIndicator(typingId);
         
         if (data.success) {
             addMessage(data.answer, 'bot');
+            currentSessionId = data.sessionId;
+            loadSessions();
         } else {
             throw new Error(data.error || 'Failed to get answer');
         }
@@ -290,10 +320,6 @@ function addMessage(text, type) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}-message`;
     
-    const avatar = document.createElement('div');
-    avatar.className = 'message-avatar';
-    avatar.textContent = type === 'user' ? '👤' : '🤖';
-    
     const content = document.createElement('div');
     content.className = 'message-content';
     
@@ -301,7 +327,6 @@ function addMessage(text, type) {
     p.textContent = text;
     content.appendChild(p);
     
-    messageDiv.appendChild(avatar);
     messageDiv.appendChild(content);
     
     chatMessages.appendChild(messageDiv);
@@ -313,10 +338,6 @@ function addTypingIndicator() {
     messageDiv.className = 'message bot-message';
     messageDiv.id = 'typing-indicator';
     
-    const avatar = document.createElement('div');
-    avatar.className = 'message-avatar';
-    avatar.textContent = '🤖';
-    
     const content = document.createElement('div');
     content.className = 'message-content';
     
@@ -325,7 +346,6 @@ function addTypingIndicator() {
     typing.innerHTML = '<span></span><span></span><span></span>';
     content.appendChild(typing);
     
-    messageDiv.appendChild(avatar);
     messageDiv.appendChild(content);
     
     chatMessages.appendChild(messageDiv);
@@ -339,53 +359,136 @@ function removeTypingIndicator(id) {
     if (indicator) indicator.remove();
 }
 
-// UI Functions
-function showSection(section) {
-    uploadSection.style.display = 'none';
-    processingSection.style.display = 'none';
-    chatSection.style.display = 'none';
-    
-    if (section === 'upload') {
-        uploadSection.style.display = 'block';
-    } else if (section === 'processing') {
-        processingSection.style.display = 'block';
-    } else if (section === 'chat') {
-        chatSection.style.display = 'block';
+// Session Management
+async function loadSessions() {
+    try {
+        const response = await fetch(`${API_URL}/chat/history`);
+        const data = await response.json();
+        
+        const sessionList = document.getElementById('session-list');
+        if (data.sessions && data.sessions.length > 0) {
+            sessionList.innerHTML = data.sessions.slice(0, 10).map(session => `
+                <div class="history-item ${session.id === currentSessionId ? 'active' : ''}" 
+                     onclick="loadSession('${session.id}')">
+                    <div style="font-weight: 600; margin-bottom: 4px;">
+                        ${new Date(session.createdAt).toLocaleDateString()}
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-light);">
+                        ${session.chats.length} messages
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            sessionList.innerHTML = '<p style="color: var(--text-light); font-size: 0.9rem;">No sessions yet</p>';
+        }
+    } catch (error) {
+        console.error('Failed to load sessions:', error);
     }
 }
 
-function showChatSection() {
-    showSection('chat');
-    chatInput.focus();
+async function loadSession(sessionId) {
+    try {
+        const response = await fetch(`${API_URL}/chat/history/${sessionId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            chatMessages.innerHTML = '';
+            
+            data.session.chats.forEach(chat => {
+                addMessage(chat.question, 'user');
+                addMessage(chat.answer, 'bot');
+            });
+            
+            currentSessionId = sessionId;
+            loadSessions();
+        }
+    } catch (error) {
+        showStatus('Failed to load session', 'error');
+    }
 }
 
+async function loadFullHistory() {
+    try {
+        const response = await fetch(`${API_URL}/chat/history`);
+        const data = await response.json();
+        
+        const historyDiv = document.getElementById('full-history');
+        if (data.sessions && data.sessions.length > 0) {
+            historyDiv.innerHTML = data.sessions.map(session => `
+                <div style="margin: 20px 0; padding: 20px; background: var(--bg); border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="font-size: 1.1rem;">${new Date(session.createdAt).toLocaleString()}</h3>
+                        <button class="btn" onclick="deleteSession('${session.id}')" 
+                                style="padding: 6px 12px; background: var(--danger); color: white; font-size: 0.85rem;">
+                            Delete
+                        </button>
+                    </div>
+                    ${session.chats.map(chat => `
+                        <div style="margin: 15px 0; padding: 12px; background: white; border-radius: 6px;">
+                            <p style="font-weight: 600; margin-bottom: 8px;">Q: ${chat.question}</p>
+                            <p style="color: var(--text-light);">A: ${chat.answer}</p>
+                            <p style="font-size: 0.8rem; color: var(--text-light); margin-top: 8px;">
+                                ${new Date(chat.timestamp).toLocaleTimeString()}
+                            </p>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+        } else {
+            historyDiv.innerHTML = '<p style="color: var(--text-light);">No chat history available</p>';
+        }
+    } catch (error) {
+        console.error('Failed to load history:', error);
+        showStatus('Failed to load history', 'error');
+    }
+}
+
+async function deleteSession(sessionId) {
+    if (!confirm('Delete this session?')) return;
+    
+    try {
+        await fetch(`${API_URL}/chat/history/${sessionId}`, { 
+            method: 'DELETE' 
+        });
+        showStatus('Session deleted', 'success');
+        loadFullHistory();
+        if (currentSessionId === sessionId) {
+            currentSessionId = null;
+            loadSessions();
+        }
+    } catch (error) {
+        showStatus('Failed to delete session', 'error');
+    }
+}
+
+// UI Functions
 function showStatus(message, type = 'info') {
     const statusBar = document.getElementById('status-bar');
     const statusMessage = document.getElementById('status-message');
     
     statusMessage.textContent = message;
-    statusBar.className = 'status-bar ' + type;
-    statusBar.style.display = 'block';
+    statusBar.className = `status-bar ${type}`;
+    statusBar.classList.remove('hidden');
     
     setTimeout(() => {
-        statusBar.style.display = 'none';
+        statusBar.classList.add('hidden');
     }, 3000);
 }
 
 function resetApp() {
     if (confirm('Are you sure you want to upload a new video? This will clear the current session.')) {
         selectedFile = null;
+        currentSessionId = null;
         chatInput.value = '';
         chatMessages.innerHTML = `
             <div class="message bot-message">
-                <div class="message-avatar">🤖</div>
                 <div class="message-content">
                     <p>Hello! I've analyzed your lecture. Ask me anything about the content!</p>
                 </div>
             </div>
         `;
         
-        fileSelected.style.display = 'none';
+        fileSelected.classList.add('hidden');
         uploadArea.style.display = 'block';
         uploadBtn.disabled = false;
         uploadBtn.textContent = 'Upload Video';
@@ -393,6 +496,19 @@ function resetApp() {
         document.getElementById('progress-fill').style.width = '0%';
         document.getElementById('progress-text').textContent = '0%';
         
-        showSection('upload');
+        // Reset steps
+        ['audio', 'frames', 'transcript', 'ocr', 'combine'].forEach(step => {
+            const stepEl = document.getElementById(`step-${step}`);
+            if (stepEl) {
+                stepEl.classList.remove('completed');
+                stepEl.querySelector('span').textContent = '⏳';
+            }
+        });
+        
+        document.querySelector('[data-tab="upload"]').click();
     }
 }
+
+// Make functions available globally for onclick handlers
+window.loadSession = loadSession;
+window.deleteSession = deleteSession;
