@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Lecture Assistant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🎓 AI Lecture Assistant</h1>
+            <p>Upload lecture videos and chat with AI about the content</p>
+        </header>
+
+        <main class="main-content">
+            <section id="upload-section" class="section active">
+                <div class="card">
+                    <h2>Upload Lecture Video</h2>
+                    <div class="upload-area" id="upload-area">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <p>Drag & drop your lecture video here</p>
+                        <p class="or">or</p>
+                        <button class="btn btn-primary" onclick="document.getElementById('video-input').click()">
+                            Choose File
+                        </button>
+                        <input type="file" id="video-input" accept="video/*" style="display: none;">
+                        <p class="file-info">Supported: MP4, AVI, MOV, MKV (Max 500MB)</p>
+                    </div>
+                    <div id="file-selected" class="file-selected" style="display: none;">
+                        <p><strong>Selected:</strong> <span id="file-name"></span></p>
+                        <p><strong>Size:</strong> <span id="file-size"></span></p>
+                        <button class="btn btn-success" id="upload-btn">Upload Video</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="processing-section" class="section" style="display: none;">
+                <div class="card">
+                    <h2>⚙️ Processing Video</h2>
+                    <p>Please wait while we analyze your lecture...</p>
+                    
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <p class="progress-text" id="progress-text">0%</p>
+                    </div>
+
+                    <div class="steps">
+                        <div class="step" id="step-audio">
+                            <span class="step-icon">⏳</span>
+                            <span>Extracting audio</span>
+                        </div>
+                        <div class="step" id="step-frames">
+                            <span class="step-icon">⏳</span>
+                            <span>Extracting frames</span>
+                        </div>
+                        <div class="step" id="step-transcript">
+                            <span class="step-icon">⏳</span>
+                            <span>Transcribing speech</span>
+                        </div>
+                        <div class="step" id="step-ocr">
+                            <span class="step-icon">⏳</span>
+                            <span>Reading slide text</span>
+                        </div>
+                        <div class="step" id="step-combine">
+                            <span class="step-icon">⏳</span>
+                            <span>Combining data</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="chat-section" class="section" style="display: none;">
+                <div class="card chat-card">
+                    <div class="chat-header">
+                        <h2>💬 Chat with AI Assistant</h2>
+                        <button class="btn btn-small" id="new-video-btn">Upload New Video</button>
+                    </div>
+                    
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message bot-message">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message-content">
+                                <p>Hello! I've analyzed your lecture. Ask me anything about the content!</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chat-input-area">
+                        <input 
+                            type="text" 
+                            id="chat-input" 
+                            placeholder="Ask a question about the lecture..."
+                            autocomplete="off"
+                        >
+                        <button class="btn btn-primary" id="send-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="quick-questions">
+                        <p><strong>Quick questions:</strong></p>
+                        <button class="quick-btn" data-question="What is this lecture about?">What is this lecture about?</button>
+                        <button class="quick-btn" data-question="Summarize the main points">Summarize the main points</button>
+                        <button class="quick-btn" data-question="What are the key concepts?">What are the key concepts?</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <div class="status-bar" id="status-bar" style="display: none;">
+            <span id="status-message"></span>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

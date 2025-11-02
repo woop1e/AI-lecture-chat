@@ -3,9 +3,11 @@ import json
 import os
 import torch
 
-input_audio = "output/audio.wav"
-output_text = "output/transcript.txt"
-output_json = "output/transcript_segments.json"
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+input_audio = os.path.join(script_dir, "output/audio.wav")
+output_text = os.path.join(script_dir, "output/transcript.txt")
+output_json = os.path.join(script_dir, "output/transcript_segments.json")
 
 os.makedirs("output", exist_ok=True)
 

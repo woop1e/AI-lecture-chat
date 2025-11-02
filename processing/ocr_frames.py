@@ -3,11 +3,13 @@ from PIL import Image
 import os
 import json
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-frames_dir = "output/frames"
-timestamps_file = "output/frames_timestamps.json"
-output_json = "output/ocr_with_timestamps.json"
+frames_dir = os.path.join(script_dir, "output/frames")
+timestamps_file = os.path.join(script_dir, "output/frames_timestamps.json")
+output_json = os.path.join(script_dir, "output/ocr_with_timestamps.json")
 
 with open(timestamps_file, "r", encoding="utf-8") as f:
     frame_times = {item["frame"]: item["timestamp"] for item in json.load(f)}

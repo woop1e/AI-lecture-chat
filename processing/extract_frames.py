@@ -2,9 +2,12 @@ import cv2
 import os
 import json
 
-video_path = "input/lecture.mp4"
-frames_dir = "output/frames"
-meta_file = "output/frames_timestamps.json"
+# Get script directory
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+video_path = os.path.join(script_dir, "input/lecture.mp4")
+frames_dir = os.path.join(script_dir, "output/frames")
+meta_file = os.path.join(script_dir, "output/frames_timestamps.json")
 
 os.makedirs(frames_dir, exist_ok=True)
 

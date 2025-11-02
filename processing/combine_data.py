@@ -1,9 +1,11 @@
 import json
 import os
 
-transcript_file = "output/transcript_segments.json"
-ocr_file = "output/ocr_with_timestamps.json"
-output_file = "output/final_combined.json"
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+transcript_file = os.path.join(script_dir, "output/transcript_segments.json")
+ocr_file = os.path.join(script_dir, "output/ocr_with_timestamps.json")
+output_file = os.path.join(script_dir, "output/final_combined.json")
 
 with open(transcript_file, "r", encoding="utf-8") as f:
     transcript_segments = json.load(f)

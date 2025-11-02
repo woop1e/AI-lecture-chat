@@ -1,12 +1,15 @@
 import os, subprocess
 
-input_video = "input/lecture.mp4"
-output_audio = "output/audio.wav"
+# Get the directory where this script is located
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+input_video = os.path.join(script_dir, "input/lecture.mp4")
+output_audio = os.path.join(script_dir, "output/audio.wav")
 
 if not os.path.exists(input_video):
     raise FileNotFoundError(f"Video file not found: {input_video}")
 
-os.makedirs("output", exist_ok=True)
+os.makedirs(os.path.join(script_dir, "output"), exist_ok=True)
 
 print("Extracting audio from video...")
 subprocess.run([
